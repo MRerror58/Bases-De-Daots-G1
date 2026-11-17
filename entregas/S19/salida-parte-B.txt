@@ -1,0 +1,219 @@
+SET search_path TO biblioteca;
+SET
+
+====== B1. usuario ======
+SELECT nombre_usuario, count(*) FROM usuario GROUP BY 1 HAVING count(*) > 1;
+ nombre_usuario | count 
+----------------+-------
+(0 rows)
+
+SELECT count(*) AS lectores,
+       count(*) FILTER (WHERE u.nombre_usuario = l.documento) AS login_igual_a_documento
+FROM lector l JOIN usuario u USING (id_usuario);
+ lectores | login_igual_a_documento 
+----------+-------------------------
+       20 |                      20
+(1 row)
+
+
+====== B2. lector ======
+SELECT conname, pg_get_constraintdef(oid)
+FROM pg_constraint
+WHERE conrelid = 'biblioteca.lector'::regclass AND contype IN ('p', 'u')
+ORDER BY conname;
+        conname        |  pg_get_constraintdef   
+-----------------------+-------------------------
+ lector_correo_key     | UNIQUE (correo)
+ lector_documento_key  | UNIQUE (documento)
+ lector_id_usuario_key | UNIQUE (id_usuario)
+ lector_pkey           | PRIMARY KEY (id_lector)
+(4 rows)
+
+SELECT lower(correo), count(*) FROM lector GROUP BY 1 HAVING count(*) > 1;
+ lower | count 
+-------+-------
+(0 rows)
+
+SELECT count(*) AS contradicciones_activo
+FROM lector l JOIN usuario u USING (id_usuario)
+WHERE l.activo <> u.activo;
+ contradicciones_activo 
+------------------------
+                      0
+(1 row)
+
+BEGIN;
+BEGIN
+UPDATE usuario SET activo = false WHERE id_usuario = 1;
+UPDATE 1
+SELECT l.id_lector, l.activo AS lector_activo, u.activo AS usuario_activo
+FROM lector l JOIN usuario u USING (id_usuario)
+WHERE u.id_usuario = 1;
+ id_lector | lector_activo | usuario_activo 
+-----------+---------------+----------------
+         1 | t             | f
+(1 row)
+
+ROLLBACK;
+ROLLBACK
+
+====== B3. libro ======
+SELECT categoria, count(*) AS libros FROM libro GROUP BY 1 ORDER BY 2 DESC;
+    categoria    | libros 
+-----------------+--------
+ Novela          |     14
+ Infantil        |      3
+ Ciencia         |      3
+ Ciencia Ficción |      3
+ Fantasía        |      2
+ Cuento          |      2
+ Terror          |      2
+ Poesía          |      2
+ Historia        |      1
+(9 rows)
+
+SELECT autor, count(*) AS libros FROM libro GROUP BY 1 HAVING count(*) > 1 ORDER BY 2 DESC;
+         autor          | libros 
+------------------------+--------
+ Gabriel García Márquez |      3
+ Jorge Luis Borges      |      2
+(2 rows)
+
+SELECT lower(btrim(categoria)) AS categoria, count(DISTINCT categoria) AS variantes
+FROM libro GROUP BY 1 HAVING count(DISTINCT categoria) > 1;
+ categoria | variantes 
+-----------+-----------
+(0 rows)
+
+SELECT lower(btrim(autor)) AS autor, count(DISTINCT autor) AS variantes
+FROM libro GROUP BY 1 HAVING count(DISTINCT autor) > 1;
+ autor | variantes 
+-------+-----------
+(0 rows)
+
+BEGIN;
+BEGIN
+INSERT INTO libro (isbn, titulo, autor, categoria, anio_publicacion, ejemplares_disponibles)
+VALUES ('9780073523323', 'Fundamentos de bases de datos',
+        'Silberschatz, Korth, Sudarshan', 'Ciencia', 2019, 2);
+INSERT 0 1
+SELECT count(*) AS libros_de_korth_con_like FROM libro WHERE autor LIKE '%Korth%';
+ libros_de_korth_con_like 
+--------------------------
+                        1
+(1 row)
+
+SELECT isbn, autor FROM libro WHERE autor LIKE '%,%';
+     isbn      |             autor              
+---------------+--------------------------------
+ 9780073523323 | Silberschatz, Korth, Sudarshan
+(1 row)
+
+ROLLBACK;
+ROLLBACK
+SELECT count(*) AS libros, count(editorial) AS con_editorial FROM libro;
+ libros | con_editorial 
+--------+---------------
+     32 |             0
+(1 row)
+
+BEGIN;
+BEGIN
+SELECT isbn, ejemplares_disponibles AS antes FROM libro WHERE isbn = '9780000000003';
+     isbn      | antes 
+---------------+-------
+ 9780000000003 |     2
+(1 row)
+
+INSERT INTO prestamo (id_lector, isbn, registrado_por, fecha_prestamo, fecha_vencimiento)
+SELECT id_lector, '9780000000003', 1, CURRENT_DATE, CURRENT_DATE + 15
+FROM lector ORDER BY id_lector LIMIT 3;
+INSERT 0 3
+SELECT l.isbn, l.ejemplares_disponibles AS despues_de_3_prestamos,
+       count(p.id_prestamo) AS prestamos_abiertos
+FROM libro l LEFT JOIN prestamo p ON p.isbn = l.isbn AND p.fecha_devolucion IS NULL
+WHERE l.isbn = '9780000000003'
+GROUP BY l.isbn, l.ejemplares_disponibles;
+     isbn      | despues_de_3_prestamos | prestamos_abiertos 
+---------------+------------------------+--------------------
+ 9780000000003 |                      2 |                  3
+(1 row)
+
+ROLLBACK;
+ROLLBACK
+
+====== B4. prestamo ======
+BEGIN;
+BEGIN
+INSERT INTO prestamo (id_lector, isbn, registrado_por, fecha_prestamo, fecha_vencimiento)
+SELECT id_lector, '9780000000001', 1, CURRENT_DATE, CURRENT_DATE + 15
+FROM lector ORDER BY id_lector LIMIT 1;
+INSERT 0 1
+INSERT INTO prestamo (id_lector, isbn, registrado_por, fecha_prestamo, fecha_vencimiento)
+SELECT id_lector, '9780000000001', 1, CURRENT_DATE, CURRENT_DATE + 15
+FROM lector ORDER BY id_lector LIMIT 1;
+INSERT 0 1
+SELECT id_lector, isbn, fecha_prestamo, count(*) AS veces
+FROM prestamo
+GROUP BY 1, 2, 3 HAVING count(*) > 1;
+ id_lector |     isbn      | fecha_prestamo | veces 
+-----------+---------------+----------------+-------
+         1 | 9780000000001 | 2026-11-17     |     2
+(1 row)
+
+ROLLBACK;
+ROLLBACK
+BEGIN;
+BEGIN
+INSERT INTO prestamo (id_lector, isbn, registrado_por, devuelto_por,
+                      fecha_prestamo, fecha_vencimiento, fecha_devolucion)
+SELECT id_lector, '9780000000002', 1, 2, CURRENT_DATE, CURRENT_DATE + 15, NULL
+FROM lector ORDER BY id_lector LIMIT 1;
+INSERT 0 1
+SELECT id_prestamo, devuelto_por, fecha_devolucion
+FROM prestamo WHERE devuelto_por IS NOT NULL AND fecha_devolucion IS NULL;
+ id_prestamo | devuelto_por | fecha_devolucion 
+-------------+--------------+------------------
+           6 |            2 | 
+(1 row)
+
+ROLLBACK;
+ROLLBACK
+SELECT rol, count(*) FROM usuario GROUP BY rol;
+  rol   | count 
+--------+-------
+ lector |    20
+(1 row)
+
+SELECT column_name FROM information_schema.columns
+WHERE table_schema = 'biblioteca' AND table_name = 'prestamo'
+ORDER BY ordinal_position;
+    column_name    
+-------------------
+ id_prestamo
+ id_lector
+ isbn
+ registrado_por
+ devuelto_por
+ fecha_prestamo
+ fecha_vencimiento
+ fecha_devolucion
+(8 rows)
+
+
+====== B5. tablas auxiliares de la carga (rechazo_carga, stg_*) ======
+SELECT c.relname AS tabla,
+       EXISTS (SELECT 1 FROM pg_constraint k
+               WHERE k.conrelid = c.oid AND k.contype = 'p') AS tiene_pk
+FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+WHERE n.nspname = 'biblioteca' AND c.relkind = 'r'
+  AND (c.relname LIKE 'stg_%' OR c.relname = 'rechazo_carga')
+ORDER BY 1;
+     tabla     | tiene_pk 
+---------------+----------
+ rechazo_carga | t
+ stg_lector    | f
+ stg_libro     | f
+ stg_linea     | f
+(4 rows)
+

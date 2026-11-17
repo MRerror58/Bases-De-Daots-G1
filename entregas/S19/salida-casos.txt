@@ -1,0 +1,745 @@
+
+=================== CASO 1: GIMNASIO ===================
+SET search_path TO gimnasio;
+SET
+SELECT count(*) AS yoga_segun_sistema     FROM socio WHERE clases LIKE '%Yoga%';
+ yoga_segun_sistema 
+--------------------
+                  2
+(1 row)
+
+SELECT count(*) AS spinning_segun_sistema FROM socio WHERE clases LIKE '%Spinning%';
+ spinning_segun_sistema 
+------------------------
+                      3
+(1 row)
+
+SELECT id_socio, nombre, clases,
+       clases LIKE '%Yoga%'     AS like_yoga,
+       clases LIKE '%Spinning%' AS like_spinning
+FROM socio
+ORDER BY id_socio;
+ id_socio |        nombre        |           clases           | like_yoga | like_spinning 
+----------+----------------------+----------------------------+-----------+---------------
+        1 | Laura Cifuentes      | Yoga; Spinning             | t         | t
+        2 | Pedro Arango         | Spinning avanzado          | f         | t
+        3 | María Fernanda Lasso | Pilates;yoga               | f         | f
+        4 | Andrés Mosquera      | Spinning; Funcional; Yoga  | t         | t
+        5 | Sofía Reyes          |                            |           | 
+        6 | Tomás Ortega         | Funcional                  | f         | f
+(6 rows)
+
+SELECT s.id_socio, '"' || c || '"' AS pedazo_crudo
+FROM socio s, string_to_table(s.clases, ';') AS c
+ORDER BY s.id_socio;
+ id_socio |    pedazo_crudo     
+----------+---------------------
+        1 | "Yoga"
+        1 | " Spinning"
+        2 | "Spinning avanzado"
+        3 | "Pilates"
+        3 | "yoga"
+        4 | "Spinning"
+        4 | " Funcional"
+        4 | " Yoga "
+        6 | "Funcional"
+(9 rows)
+
+SELECT plan FROM socio GROUP BY plan HAVING count(DISTINCT valor_plan) > 1;
+ plan 
+------
+(0 rows)
+
+SELECT plan, valor_plan, count(*) AS veces_repetido
+FROM socio GROUP BY plan, valor_plan ORDER BY count(*) DESC;
+    plan    | valor_plan | veces_repetido 
+------------+------------+----------------
+ Mensual    |      90000 |              3
+ Anual      |     850000 |              2
+ Trimestral |     240000 |              1
+(3 rows)
+
+BEGIN;
+BEGIN
+CREATE TEMP TABLE pieza ON COMMIT DROP AS
+SELECT s.id_socio,
+       upper(left(btrim(c), 1)) || lower(substr(btrim(c), 2)) AS clase
+FROM socio s, string_to_table(s.clases, ';') AS c
+WHERE btrim(c) <> '';
+SELECT 9
+CREATE TABLE plan (
+    nombre  varchar(20)  PRIMARY KEY,
+    valor   integer      NOT NULL CHECK (valor > 0)
+);
+CREATE TABLE
+INSERT INTO plan (nombre, valor)
+SELECT DISTINCT plan, valor_plan FROM socio;
+INSERT 0 3
+CREATE TABLE clase (
+    id_clase  integer      GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    nombre    varchar(40)  NOT NULL UNIQUE
+);
+CREATE TABLE
+INSERT INTO clase (nombre)
+SELECT DISTINCT clase FROM pieza ORDER BY clase;
+INSERT 0 5
+CREATE TABLE socio_clase (
+    id_socio  integer  NOT NULL REFERENCES socio (id_socio),
+    id_clase  integer  NOT NULL REFERENCES clase (id_clase),
+    PRIMARY KEY (id_socio, id_clase)
+);
+CREATE TABLE
+INSERT INTO socio_clase (id_socio, id_clase)
+SELECT DISTINCT p.id_socio, c.id_clase
+FROM pieza p JOIN clase c ON c.nombre = p.clase;
+INSERT 0 9
+SELECT 'plan' AS tabla, 3 AS esperado, count(*) AS obtenido FROM plan
+UNION ALL SELECT 'clase',       5, count(*) FROM clase
+UNION ALL SELECT 'socio',       6, count(*) FROM socio
+UNION ALL SELECT 'socio_clase', 9, count(*) FROM socio_clase;
+    tabla    | esperado | obtenido 
+-------------+----------+----------
+ plan        |        3 |        3
+ clase       |        5 |        5
+ socio       |        6 |        6
+ socio_clase |        9 |        9
+(4 rows)
+
+DO $$
+BEGIN
+    ASSERT (SELECT count(*) FROM plan) = 3,        'plan: se esperaban 3';
+    ASSERT (SELECT count(*) FROM clase) = 5,       'clase: se esperaban 5';
+    ASSERT (SELECT count(*) FROM socio) = 6,       'socio: se esperaban 6';
+    ASSERT (SELECT count(*) FROM socio_clase) = 9, 'socio_clase: se esperaban 9';
+END $$;
+DO
+SELECT id_socio, clase FROM pieza
+EXCEPT
+SELECT sc.id_socio, c.nombre FROM socio_clase sc JOIN clase c USING (id_clase);
+ id_socio | clase 
+----------+-------
+(0 rows)
+
+SELECT sc.id_socio, c.nombre FROM socio_clase sc JOIN clase c USING (id_clase)
+EXCEPT
+SELECT id_socio, clase FROM pieza;
+ id_socio | nombre 
+----------+--------
+(0 rows)
+
+SELECT s.id_socio, s.valor_plan FROM socio s
+EXCEPT
+SELECT s.id_socio, p.valor FROM socio s JOIN plan p ON p.nombre = s.plan;
+ id_socio | valor_plan 
+----------+------------
+(0 rows)
+
+ALTER TABLE socio
+    ADD CONSTRAINT fk_socio_plan FOREIGN KEY (plan) REFERENCES plan (nombre),
+    DROP COLUMN valor_plan,
+    DROP COLUMN clases;
+ALTER TABLE
+COMMIT;
+COMMIT
+SELECT c.nombre AS clase, count(sc.id_socio) AS socios
+FROM clase c LEFT JOIN socio_clase sc USING (id_clase)
+GROUP BY c.nombre
+ORDER BY c.nombre;
+       clase       | socios 
+-------------------+--------
+ Funcional         |      2
+ Pilates           |      1
+ Spinning          |      2
+ Spinning avanzado |      1
+ Yoga              |      3
+(5 rows)
+
+
+=================== CASO 2: FARMACIA ===================
+SET search_path TO farmacia;
+SET
+SELECT count(*) AS formulas_con_acetaminofen
+FROM formula
+WHERE medicamento1 LIKE 'Acetaminof%'
+   OR medicamento2 LIKE 'Acetaminof%'
+   OR medicamento3 LIKE 'Acetaminof%';
+ formulas_con_acetaminofen 
+---------------------------
+                         3
+(1 row)
+
+SELECT num_formula,
+       CASE WHEN medicamento1 LIKE 'Acetaminof%' THEN 'medicamento1'
+            WHEN medicamento2 LIKE 'Acetaminof%' THEN 'medicamento2'
+            WHEN medicamento3 LIKE 'Acetaminof%' THEN 'medicamento3' END AS columna
+FROM formula
+WHERE 'Acetaminofén 500 mg' IN (medicamento1, medicamento2, medicamento3);
+ num_formula |   columna    
+-------------+--------------
+         701 | medicamento1
+         703 | medicamento3
+         704 | medicamento2
+(3 rows)
+
+SELECT count(*) FILTER (WHERE medicamento2 IS NULL)
+     + count(*) FILTER (WHERE medicamento3 IS NULL) AS casillas_vacias,
+       count(*) * 3 AS casillas_totales
+FROM formula;
+ casillas_vacias | casillas_totales 
+-----------------+------------------
+               4 |               12
+(1 row)
+
+SELECT doc_paciente, nombre_paciente, count(*) AS veces
+FROM formula GROUP BY doc_paciente, nombre_paciente ORDER BY count(*) DESC;
+ doc_paciente | nombre_paciente | veces 
+--------------+-----------------+-------
+ 1110000111   | Rosa Díaz       |     2
+ 1110000222   | Óscar Paz       |     1
+ 1110000333   | Elsa Mina       |     1
+(3 rows)
+
+SELECT doc_paciente FROM formula GROUP BY doc_paciente
+HAVING count(DISTINCT nombre_paciente) > 1;
+ doc_paciente 
+--------------
+(0 rows)
+
+WITH linea AS (
+    SELECT num_formula, medicamento1 AS medicamento, dosis1 AS dosis FROM formula
+    UNION ALL
+    SELECT num_formula, medicamento2, dosis2 FROM formula WHERE medicamento2 IS NOT NULL
+    UNION ALL
+    SELECT num_formula, medicamento3, dosis3 FROM formula WHERE medicamento3 IS NOT NULL
+)
+SELECT medicamento, count(DISTINCT dosis) AS dosis_distintas,
+       string_agg(DISTINCT dosis, ' / ') AS dosis
+FROM linea GROUP BY medicamento HAVING count(DISTINCT dosis) > 1;
+     medicamento     | dosis_distintas |        dosis        
+---------------------+-----------------+---------------------
+ Acetaminofén 500 mg |               2 | cada 6 h / cada 8 h
+(1 row)
+
+BEGIN;
+BEGIN
+INSERT INTO formula VALUES
+    (799, '2026-10-20', '1110000333', 'Elsa Mina',
+     'Loratadina 10 mg', 'cada 24 h', 'Loratadina 10 mg', 'cada 12 h', 'Omeprazol 20 mg', NULL);
+INSERT 0 1
+SELECT num_formula, medicamento1, medicamento2, medicamento3, dosis3
+FROM formula WHERE num_formula = 799;
+ num_formula |   medicamento1   |   medicamento2   |  medicamento3   | dosis3 
+-------------+------------------+------------------+-----------------+--------
+         799 | Loratadina 10 mg | Loratadina 10 mg | Omeprazol 20 mg | 
+(1 row)
+
+ROLLBACK;
+ROLLBACK
+BEGIN;
+BEGIN
+CREATE TEMP TABLE linea ON COMMIT DROP AS
+SELECT num_formula, medicamento1 AS medicamento, dosis1 AS dosis FROM formula
+UNION ALL
+SELECT num_formula, medicamento2, dosis2 FROM formula WHERE medicamento2 IS NOT NULL
+UNION ALL
+SELECT num_formula, medicamento3, dosis3 FROM formula WHERE medicamento3 IS NOT NULL;
+SELECT 8
+CREATE TABLE paciente (
+    doc_paciente  varchar(15)  PRIMARY KEY,
+    nombre        varchar(80)  NOT NULL
+);
+CREATE TABLE
+INSERT INTO paciente (doc_paciente, nombre)
+SELECT DISTINCT doc_paciente, nombre_paciente FROM formula;
+INSERT 0 3
+CREATE TABLE medicamento (
+    id_medicamento  integer      GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    nombre          varchar(60)  NOT NULL UNIQUE
+);
+CREATE TABLE
+INSERT INTO medicamento (nombre)
+SELECT DISTINCT medicamento FROM linea ORDER BY medicamento;
+INSERT 0 5
+CREATE TABLE formula_medicamento (
+    num_formula     integer      NOT NULL REFERENCES formula (num_formula),
+    id_medicamento  integer      NOT NULL REFERENCES medicamento (id_medicamento),
+    dosis           varchar(40)  NOT NULL,
+    PRIMARY KEY (num_formula, id_medicamento)
+);
+CREATE TABLE
+INSERT INTO formula_medicamento (num_formula, id_medicamento, dosis)
+SELECT l.num_formula, m.id_medicamento, l.dosis
+FROM linea l JOIN medicamento m ON m.nombre = l.medicamento;
+INSERT 0 8
+SELECT 'paciente' AS tabla, 3 AS esperado, count(*) AS obtenido FROM paciente
+UNION ALL SELECT 'medicamento',         5, count(*) FROM medicamento
+UNION ALL SELECT 'formula',             4, count(*) FROM formula
+UNION ALL SELECT 'formula_medicamento', 8, count(*) FROM formula_medicamento;
+        tabla        | esperado | obtenido 
+---------------------+----------+----------
+ paciente            |        3 |        3
+ medicamento         |        5 |        5
+ formula             |        4 |        4
+ formula_medicamento |        8 |        8
+(4 rows)
+
+DO $$
+BEGIN
+    ASSERT (SELECT count(*) FROM paciente) = 3,            'paciente: se esperaban 3';
+    ASSERT (SELECT count(*) FROM medicamento) = 5,         'medicamento: se esperaban 5';
+    ASSERT (SELECT count(*) FROM formula) = 4,             'formula: se esperaban 4';
+    ASSERT (SELECT count(*) FROM formula_medicamento) = 8, 'formula_medicamento: se esperaban 8';
+END $$;
+DO
+SELECT num_formula, medicamento, dosis FROM linea
+EXCEPT
+SELECT fm.num_formula, m.nombre, fm.dosis
+FROM formula_medicamento fm JOIN medicamento m USING (id_medicamento);
+ num_formula | medicamento | dosis 
+-------------+-------------+-------
+(0 rows)
+
+SELECT fm.num_formula, m.nombre, fm.dosis
+FROM formula_medicamento fm JOIN medicamento m USING (id_medicamento)
+EXCEPT
+SELECT num_formula, medicamento, dosis FROM linea;
+ num_formula | nombre | dosis 
+-------------+--------+-------
+(0 rows)
+
+SELECT num_formula, doc_paciente, nombre_paciente FROM formula
+EXCEPT
+SELECT f.num_formula, p.doc_paciente, p.nombre
+FROM formula f JOIN paciente p USING (doc_paciente);
+ num_formula | doc_paciente | nombre_paciente 
+-------------+--------------+-----------------
+(0 rows)
+
+ALTER TABLE formula
+    ADD CONSTRAINT fk_formula_paciente
+        FOREIGN KEY (doc_paciente) REFERENCES paciente (doc_paciente),
+    DROP COLUMN nombre_paciente,
+    DROP COLUMN medicamento1, DROP COLUMN dosis1,
+    DROP COLUMN medicamento2, DROP COLUMN dosis2,
+    DROP COLUMN medicamento3, DROP COLUMN dosis3;
+ALTER TABLE
+COMMIT;
+COMMIT
+SELECT m.nombre, count(*) AS formulas
+FROM formula_medicamento fm JOIN medicamento m USING (id_medicamento)
+WHERE m.nombre LIKE 'Acetaminof%'
+GROUP BY m.nombre;
+       nombre        | formulas 
+---------------------+----------
+ Acetaminofén 500 mg |        3
+(1 row)
+
+BEGIN;
+BEGIN
+INSERT INTO formula (num_formula, fecha, doc_paciente) VALUES (705, '2026-10-15', '1110000222');
+INSERT 0 1
+INSERT INTO formula_medicamento (num_formula, id_medicamento, dosis)
+SELECT 705, id_medicamento, 'cada 12 h' FROM medicamento
+WHERE nombre IN ('Amoxicilina 500 mg', 'Ibuprofeno 400 mg', 'Omeprazol 20 mg', 'Loratadina 10 mg');
+INSERT 0 4
+SELECT f.num_formula, p.nombre AS paciente, m.nombre AS medicamento, fm.dosis
+FROM formula f
+JOIN paciente p USING (doc_paciente)
+JOIN formula_medicamento fm USING (num_formula)
+JOIN medicamento m USING (id_medicamento)
+WHERE f.num_formula = 705;
+ num_formula | paciente  |    medicamento     |   dosis   
+-------------+-----------+--------------------+-----------
+         705 | Óscar Paz | Amoxicilina 500 mg | cada 12 h
+         705 | Óscar Paz | Ibuprofeno 400 mg  | cada 12 h
+         705 | Óscar Paz | Loratadina 10 mg   | cada 12 h
+         705 | Óscar Paz | Omeprazol 20 mg    | cada 12 h
+(4 rows)
+
+ROLLBACK;
+ROLLBACK
+
+=================== CASO 3: CURSOS LIBRES ===================
+SET search_path TO cursos_libres;
+SET
+SELECT nombre_curso, count(*) AS inscripciones, sum(valor_pagado) AS recaudo_segun_sistema
+FROM inscripcion GROUP BY nombre_curso ORDER BY nombre_curso;
+    nombre_curso    | inscripciones | recaudo_segun_sistema 
+--------------------+---------------+-----------------------
+ Cerámica           |             2 |                340000
+ Fotografía digital |             3 |                580000
+ Guitarra básica    |             3 |                450000
+(3 rows)
+
+SELECT doc_participante, cod_curso, count(*) AS veces, array_agg(id ORDER BY id) AS ids
+FROM inscripcion
+GROUP BY doc_participante, cod_curso
+HAVING count(*) > 1;
+ doc_participante | cod_curso | veces |  ids  
+------------------+-----------+-------+-------
+ 1140000900       | C20       |     2 | {3,7}
+(1 row)
+
+SELECT * FROM inscripcion WHERE id IN (3, 7);
+ id | doc_participante | nombre_participante |         correo         | cod_curso |    nombre_curso    | cod_sede | direccion_sede | valor_pagado 
+----+------------------+---------------------+------------------------+-----------+--------------------+----------+----------------+--------------
+  3 | 1140000900       | Juliana Rey         | juliana.rey@correo.com | C20       | Fotografía digital | S2       | Av 6N # 25-40  |       200000
+  7 | 1140000900       | Juliana Rey         | juliana.rey@correo.com | C20       | Fotografía digital | S2       | Av 6N # 25-40  |       200000
+(2 rows)
+
+SELECT 'doc -> nombre, correo' AS dependencia, count(*) AS violaciones
+FROM (SELECT doc_participante FROM inscripcion GROUP BY 1
+      HAVING count(DISTINCT nombre_participante || '|' || correo) > 1) x
+UNION ALL
+SELECT 'correo -> doc', count(*)
+FROM (SELECT correo FROM inscripcion GROUP BY 1
+      HAVING count(DISTINCT doc_participante) > 1) x
+UNION ALL
+SELECT 'cod_curso -> nombre_curso, cod_sede', count(*)
+FROM (SELECT cod_curso FROM inscripcion GROUP BY 1
+      HAVING count(DISTINCT nombre_curso || '|' || cod_sede) > 1) x
+UNION ALL
+SELECT 'cod_sede -> direccion_sede', count(*)
+FROM (SELECT cod_sede FROM inscripcion GROUP BY 1
+      HAVING count(DISTINCT direccion_sede) > 1) x;
+             dependencia             | violaciones 
+-------------------------------------+-------------
+ doc -> nombre, correo               |           0
+ correo -> doc                       |           0
+ cod_curso -> nombre_curso, cod_sede |           0
+ cod_sede -> direccion_sede          |           0
+(4 rows)
+
+SELECT cod_sede, direccion_sede, count(*) AS veces
+FROM inscripcion GROUP BY 1, 2 ORDER BY 3 DESC;
+ cod_sede | direccion_sede | veces 
+----------+----------------+-------
+ S1       | Cra 5 # 10-20  |     5
+ S2       | Av 6N # 25-40  |     3
+(2 rows)
+
+SELECT doc_participante, nombre_participante, count(*) AS veces
+FROM inscripcion GROUP BY 1, 2 ORDER BY 3 DESC;
+ doc_participante | nombre_participante | veces 
+------------------+---------------------+-------
+ 1140000900       | Juliana Rey         |     3
+ 1140000902       | Valeria Ospina      |     2
+ 1140000901       | Mateo Gil           |     2
+ 1140000903       | Esteban Cruz        |     1
+(4 rows)
+
+BEGIN;
+BEGIN
+ALTER TABLE inscripcion RENAME TO inscripcion_vieja;
+ALTER TABLE
+CREATE TABLE participante (
+    doc_participante  varchar(15)   PRIMARY KEY,
+    nombre            varchar(80)   NOT NULL,
+    correo            varchar(120)  NOT NULL UNIQUE
+);
+CREATE TABLE
+INSERT INTO participante (doc_participante, nombre, correo)
+SELECT DISTINCT doc_participante, nombre_participante, correo FROM inscripcion_vieja;
+INSERT 0 4
+CREATE TABLE sede (
+    cod_sede   char(2)      PRIMARY KEY,
+    direccion  varchar(60)  NOT NULL
+);
+CREATE TABLE
+INSERT INTO sede (cod_sede, direccion)
+SELECT DISTINCT cod_sede, direccion_sede FROM inscripcion_vieja;
+INSERT 0 2
+CREATE TABLE curso (
+    cod_curso  char(3)      PRIMARY KEY,
+    nombre     varchar(60)  NOT NULL,
+    cod_sede   char(2)      NOT NULL REFERENCES sede (cod_sede)
+);
+CREATE TABLE
+INSERT INTO curso (cod_curso, nombre, cod_sede)
+SELECT DISTINCT cod_curso, nombre_curso, cod_sede FROM inscripcion_vieja;
+INSERT 0 3
+CREATE TABLE inscripcion (
+    doc_participante  varchar(15)  NOT NULL REFERENCES participante (doc_participante),
+    cod_curso         char(3)      NOT NULL REFERENCES curso (cod_curso),
+    valor_pagado      integer      NOT NULL CHECK (valor_pagado >= 0),
+    PRIMARY KEY (doc_participante, cod_curso)
+);
+CREATE TABLE
+INSERT INTO inscripcion (doc_participante, cod_curso, valor_pagado)
+SELECT DISTINCT ON (doc_participante, cod_curso)
+       doc_participante, cod_curso, valor_pagado
+FROM inscripcion_vieja
+ORDER BY doc_participante, cod_curso, id;
+INSERT 0 7
+SELECT 'participante' AS tabla, 4 AS esperado, count(*) AS obtenido FROM participante
+UNION ALL SELECT 'sede',        2, count(*) FROM sede
+UNION ALL SELECT 'curso',       3, count(*) FROM curso
+UNION ALL SELECT 'inscripcion', 7, count(*) FROM inscripcion;
+    tabla     | esperado | obtenido 
+--------------+----------+----------
+ participante |        4 |        4
+ sede         |        2 |        2
+ curso        |        3 |        3
+ inscripcion  |        7 |        7
+(4 rows)
+
+DO $$
+BEGIN
+    ASSERT (SELECT count(*) FROM participante) = 4, 'participante: se esperaban 4';
+    ASSERT (SELECT count(*) FROM sede) = 2,         'sede: se esperaban 2';
+    ASSERT (SELECT count(*) FROM curso) = 3,        'curso: se esperaban 3';
+    ASSERT (SELECT count(*) FROM inscripcion) = 7,  'inscripcion: se esperaban 7';
+END $$;
+DO
+SELECT doc_participante, nombre_participante, correo, cod_curso,
+       nombre_curso, cod_sede, direccion_sede, valor_pagado
+FROM inscripcion_vieja
+EXCEPT
+SELECT i.doc_participante, p.nombre, p.correo, i.cod_curso,
+       c.nombre, c.cod_sede, s.direccion, i.valor_pagado
+FROM inscripcion i
+JOIN participante p USING (doc_participante)
+JOIN curso c USING (cod_curso)
+JOIN sede s USING (cod_sede);
+ doc_participante | nombre_participante | correo | cod_curso | nombre_curso | cod_sede | direccion_sede | valor_pagado 
+------------------+---------------------+--------+-----------+--------------+----------+----------------+--------------
+(0 rows)
+
+SELECT i.doc_participante, p.nombre, p.correo, i.cod_curso,
+       c.nombre, c.cod_sede, s.direccion, i.valor_pagado
+FROM inscripcion i
+JOIN participante p USING (doc_participante)
+JOIN curso c USING (cod_curso)
+JOIN sede s USING (cod_sede)
+EXCEPT
+SELECT doc_participante, nombre_participante, correo, cod_curso,
+       nombre_curso, cod_sede, direccion_sede, valor_pagado
+FROM inscripcion_vieja;
+ doc_participante | nombre | correo | cod_curso | nombre | cod_sede | direccion | valor_pagado 
+------------------+--------+--------+-----------+--------+----------+-----------+--------------
+(0 rows)
+
+DROP TABLE inscripcion_vieja;
+DROP TABLE
+COMMIT;
+COMMIT
+SELECT c.nombre AS curso, count(*) AS inscripciones, sum(i.valor_pagado) AS recaudo
+FROM inscripcion i JOIN curso c USING (cod_curso)
+GROUP BY c.nombre ORDER BY c.nombre;
+       curso        | inscripciones | recaudo 
+--------------------+---------------+---------
+ Cerámica           |             2 |  340000
+ Fotografía digital |             2 |  380000
+ Guitarra básica    |             3 |  450000
+(3 rows)
+
+DO $$
+BEGIN
+    INSERT INTO cursos_libres.inscripcion VALUES ('1140000900', 'C20', 200000);
+    RAISE NOTICE 'ERROR: se aceptó un duplicado';
+EXCEPTION WHEN unique_violation THEN
+    RAISE NOTICE 'Duplicado rechazado: %', SQLERRM;
+END $$;
+psql:/scripts/casos.sql:582: NOTICE:  Duplicado rechazado: duplicate key value violates unique constraint "inscripcion_pkey1"
+DO
+
+=================== CASO 4: ENVIOS ===================
+SET search_path TO envios;
+SET
+SELECT num_guia, ciudad_destino, peso_kg, tarifa_kg, valor,
+       peso_kg * tarifa_kg AS valor_calculado,
+       valor - peso_kg * tarifa_kg AS cobrado_de_mas
+FROM envio
+WHERE valor <> peso_kg * tarifa_kg;
+ num_guia | ciudad_destino | peso_kg | tarifa_kg | valor | valor_calculado | cobrado_de_mas 
+----------+----------------+---------+-----------+-------+-----------------+----------------
+ G07      | Bogotá         |     4.0 |      6000 | 42000 |         24000.0 |        18000.0
+(1 row)
+
+SELECT ciudad_destino FROM envio GROUP BY 1
+HAVING count(DISTINCT departamento || '|' || zona) > 1;
+ ciudad_destino 
+----------------
+(0 rows)
+
+SELECT zona FROM envio GROUP BY 1 HAVING count(DISTINCT tarifa_kg) > 1;
+ zona 
+------
+(0 rows)
+
+SELECT ciudad_destino, departamento, zona, tarifa_kg, count(*) AS veces
+FROM envio GROUP BY 1, 2, 3, 4 ORDER BY 5 DESC;
+ ciudad_destino |  departamento   | zona | tarifa_kg | veces 
+----------------+-----------------+------+-----------+-------
+ Medellín       | Antioquia       |    2 |      6000 |     2
+ Bogotá         | Bogotá D.C.     |    2 |      6000 |     2
+ Cali           | Valle del Cauca |    1 |      4000 |     2
+ Palmira        | Valle del Cauca |    1 |      4000 |     1
+ Pasto          | Nariño          |    3 |      9000 |     1
+(5 rows)
+
+BEGIN;
+BEGIN
+CREATE TEMP TABLE envio_original ON COMMIT DROP AS SELECT * FROM envio;
+SELECT 8
+CREATE TABLE zona (
+    zona       smallint  PRIMARY KEY,
+    tarifa_kg  integer   NOT NULL CHECK (tarifa_kg > 0)
+);
+CREATE TABLE
+INSERT INTO zona (zona, tarifa_kg)
+SELECT DISTINCT zona, tarifa_kg FROM envio;
+INSERT 0 3
+CREATE TABLE ciudad (
+    id_ciudad     integer      GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    nombre        varchar(40)  NOT NULL,
+    departamento  varchar(40)  NOT NULL,
+    zona          smallint     NOT NULL REFERENCES zona (zona),
+    UNIQUE (nombre, departamento)
+);
+CREATE TABLE
+INSERT INTO ciudad (nombre, departamento, zona)
+SELECT DISTINCT ciudad_destino, departamento, zona FROM envio ORDER BY 1;
+INSERT 0 5
+ALTER TABLE envio ADD COLUMN id_ciudad integer;
+ALTER TABLE
+UPDATE envio e
+SET id_ciudad = c.id_ciudad
+FROM ciudad c
+WHERE c.nombre = e.ciudad_destino AND c.departamento = e.departamento;
+UPDATE 8
+ALTER TABLE envio
+    ALTER COLUMN id_ciudad SET NOT NULL,
+    ADD CONSTRAINT fk_envio_ciudad FOREIGN KEY (id_ciudad) REFERENCES ciudad (id_ciudad),
+    ADD CONSTRAINT chk_peso CHECK (peso_kg > 0);
+ALTER TABLE
+SELECT 'zona' AS tabla, 3 AS esperado, count(*) AS obtenido FROM zona
+UNION ALL SELECT 'ciudad', 5, count(*) FROM ciudad
+UNION ALL SELECT 'envio',  8, count(*) FROM envio;
+ tabla  | esperado | obtenido 
+--------+----------+----------
+ zona   |        3 |        3
+ ciudad |        5 |        5
+ envio  |        8 |        8
+(3 rows)
+
+DO $$
+BEGIN
+    ASSERT (SELECT count(*) FROM zona) = 3,   'zona: se esperaban 3';
+    ASSERT (SELECT count(*) FROM ciudad) = 5, 'ciudad: se esperaban 5';
+    ASSERT (SELECT count(*) FROM envio) = 8,  'envio: se esperaban 8';
+END $$;
+DO
+SELECT num_guia, fecha, ciudad_destino, departamento, zona, tarifa_kg, peso_kg
+FROM envio_original
+EXCEPT
+SELECT e.num_guia, e.fecha, c.nombre, c.departamento, z.zona, z.tarifa_kg, e.peso_kg
+FROM envio e JOIN ciudad c USING (id_ciudad) JOIN zona z ON z.zona = c.zona;
+ num_guia | fecha | ciudad_destino | departamento | zona | tarifa_kg | peso_kg 
+----------+-------+----------------+--------------+------+-----------+---------
+(0 rows)
+
+SELECT e.num_guia, e.fecha, c.nombre, c.departamento, z.zona, z.tarifa_kg, e.peso_kg
+FROM envio e JOIN ciudad c USING (id_ciudad) JOIN zona z ON z.zona = c.zona
+EXCEPT
+SELECT num_guia, fecha, ciudad_destino, departamento, zona, tarifa_kg, peso_kg
+FROM envio_original;
+ num_guia | fecha | nombre | departamento | zona | tarifa_kg | peso_kg 
+----------+-------+--------+--------------+------+-----------+---------
+(0 rows)
+
+ALTER TABLE envio
+    DROP COLUMN ciudad_destino,
+    DROP COLUMN departamento,
+    DROP COLUMN zona,
+    DROP COLUMN tarifa_kg,
+    DROP COLUMN valor;
+ALTER TABLE
+CREATE VIEW envio_valor AS
+SELECT e.num_guia, e.fecha, c.nombre AS ciudad, c.departamento, c.zona,
+       z.tarifa_kg, e.peso_kg,
+       round(e.peso_kg * z.tarifa_kg)::integer AS valor
+FROM envio e
+JOIN ciudad c USING (id_ciudad)
+JOIN zona z ON z.zona = c.zona;
+CREATE VIEW
+SELECT o.num_guia, o.valor AS valor_guardado, v.valor AS valor_calculado
+FROM envio_original o JOIN envio_valor v USING (num_guia)
+WHERE o.valor <> v.valor;
+ num_guia | valor_guardado | valor_calculado 
+----------+----------------+-----------------
+ G07      |          42000 |           24000
+(1 row)
+
+DO $$
+BEGIN
+    ASSERT (SELECT count(*) FROM envio_original o JOIN envio_valor v USING (num_guia)
+            WHERE o.valor <> v.valor) = 1, 'solo G07 debía diferir';
+END $$;
+DO
+COMMIT;
+COMMIT
+SELECT num_guia, fecha, ciudad, peso_kg, tarifa_kg, valor
+FROM envio_valor WHERE ciudad = 'Bogotá' ORDER BY num_guia;
+ num_guia |   fecha    | ciudad | peso_kg | tarifa_kg | valor 
+----------+------------+--------+---------+-----------+-------
+ G03      | 2026-10-02 | Bogotá |     1.0 |      6000 |  6000
+ G07      | 2026-10-08 | Bogotá |     4.0 |      6000 | 24000
+(2 rows)
+
+BEGIN;
+BEGIN
+UPDATE zona SET tarifa_kg = 7000 WHERE zona = 2;
+UPDATE 1
+SELECT num_guia, fecha, ciudad, tarifa_kg, valor AS valor_octubre_recalculado
+FROM envio_valor WHERE zona = 2 ORDER BY num_guia;
+ num_guia |   fecha    |  ciudad  | tarifa_kg | valor_octubre_recalculado 
+----------+------------+----------+-----------+---------------------------
+ G03      | 2026-10-02 | Bogotá   |      7000 |                      7000
+ G04      | 2026-10-02 | Medellín |      7000 |                     21000
+ G07      | 2026-10-08 | Bogotá   |      7000 |                     28000
+ G08      | 2026-10-09 | Medellín |      7000 |                     10500
+(4 rows)
+
+ROLLBACK;
+ROLLBACK
+BEGIN;
+BEGIN
+ALTER TABLE envio ADD COLUMN tarifa_kg_aplicada integer;
+ALTER TABLE
+UPDATE envio e
+SET tarifa_kg_aplicada = z.tarifa_kg
+FROM ciudad c JOIN zona z ON z.zona = c.zona
+WHERE c.id_ciudad = e.id_ciudad;
+UPDATE 8
+ALTER TABLE envio
+    ALTER COLUMN tarifa_kg_aplicada SET NOT NULL,
+    ADD CONSTRAINT chk_tarifa_aplicada CHECK (tarifa_kg_aplicada > 0);
+ALTER TABLE
+CREATE OR REPLACE VIEW envio_valor AS
+SELECT e.num_guia, e.fecha, c.nombre AS ciudad, c.departamento, c.zona,
+       e.tarifa_kg_aplicada AS tarifa_kg, e.peso_kg,
+       round(e.peso_kg * e.tarifa_kg_aplicada)::integer AS valor
+FROM envio e
+JOIN ciudad c USING (id_ciudad);
+CREATE VIEW
+COMMIT;
+COMMIT
+BEGIN;
+BEGIN
+UPDATE zona SET tarifa_kg = 7000 WHERE zona = 2;
+UPDATE 1
+SELECT num_guia, fecha, ciudad, tarifa_kg, valor AS valor_octubre
+FROM envio_valor WHERE zona = 2 ORDER BY num_guia;
+ num_guia |   fecha    |  ciudad  | tarifa_kg | valor_octubre 
+----------+------------+----------+-----------+---------------
+ G03      | 2026-10-02 | Bogotá   |      6000 |          6000
+ G04      | 2026-10-02 | Medellín |      6000 |         18000
+ G07      | 2026-10-08 | Bogotá   |      6000 |         24000
+ G08      | 2026-10-09 | Medellín |      6000 |          9000
+(4 rows)
+
+ROLLBACK;
+ROLLBACK
+
+=================== FIN ===================
