@@ -1,5 +1,15 @@
 # Entorno Docker del curso — PostgreSQL + pgAdmin + Node.js
 
+**Grupo 1 · Proyecto Biblioteca**
+
+| Integrante | Código |
+|---|---|
+| Santiago Ruiz Vanegas | 202177804 |
+| Juan David Vasquez Cañas | 2515123 |
+| Omar Esteban Agredo Titimbo | 2516317 |
+
+Entregas: [`entregas/S16/`](entregas/S16/) (Hito 2) y [`entregas/S19/`](entregas/S19/).
+
 Un único `docker-compose.yml` para **todas las prácticas del semestre y el
 proyecto final**. No se clona ni se copia por práctica: se levanta una vez y
 se reutiliza, cambiando solo el contenido de tres carpetas. Pensado para que
