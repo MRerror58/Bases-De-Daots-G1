@@ -57,7 +57,7 @@ UPDATE stg_lector SET motivo = CASE
                                                   THEN 'documento ya existe'
     WHEN EXISTS (SELECT 1 FROM usuario u WHERE u.nombre_usuario = stg_lector.documento)
                                                   THEN 'nombre de usuario ya existe'
-    WHEN EXISTS (SELECT 1 FROM lector l WHERE l.correo = stg_lector.correo)
+    WHEN EXISTS (SELECT 1 FROM lector l WHERE lower(l.correo) = stg_lector.correo)
                                                   THEN 'correo ya registrado por otro lector'
 END;
 

@@ -1,0 +1,139 @@
+########## Base con los 15 préstamos de prueba de S16 confirmados (prueba_migracion)
+SET
+DO
+
+== 1. Evidencia antes del cambio ==
+ libros | ejemplares_declarados | lectores | usuarios | prestamos | prestamos_abiertos 
+--------+-----------------------+----------+----------+-----------+--------------------
+     32 |                    94 |       20 |       21 |        15 |                  6
+(1 row)
+
+    categoria    | libros 
+-----------------+--------
+ Novela          |     14
+ Ciencia         |      3
+ Ciencia Ficción |      3
+ Infantil        |      3
+ Cuento          |      2
+ Fantasía        |      2
+ Poesía          |      2
+ Terror          |      2
+ Historia        |      1
+(9 rows)
+
+         autor          | libros 
+------------------------+--------
+ Gabriel García Márquez |      3
+ Jorge Luis Borges      |      2
+(2 rows)
+
+ prestamos_duplicados | devoluciones_a_medias | correos_repetidos_sin_mayusculas 
+----------------------+-----------------------+----------------------------------
+                    0 |                     0 |                                0
+(1 row)
+
+BEGIN
+SELECT 32
+SELECT 15
+
+== 2. Catálogos: categoria, autor, editorial ==
+CREATE TABLE
+INSERT 0 9
+CREATE TABLE
+INSERT 0 29
+CREATE TABLE
+INSERT 0 0
+CREATE TABLE
+INSERT 0 32
+ALTER TABLE
+UPDATE 32
+UPDATE 0
+ALTER TABLE
+
+== 3. Ejemplares y préstamo por ejemplar ==
+CREATE TABLE
+INSERT 0 94
+ALTER TABLE
+UPDATE 6
+UPDATE 9
+ALTER TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+
+== 4. lector: correo único sin distinguir mayúsculas ==
+ALTER TABLE
+CREATE INDEX
+COMMENT
+COMMENT
+COMMENT
+
+== 5. Vistas de lo derivado ==
+CREATE VIEW
+CREATE VIEW
+
+== 6. Verificación (antes de borrar las columnas viejas) ==
+ libros_antes | libros_despues | ejemplares_declarados | ejemplares_creados | prestamos_antes | prestamos_despues | categorias | autores | libro_autor | editoriales 
+--------------+----------------+-----------------------+--------------------+-----------------+-------------------+------------+---------+-------------+-------------
+           32 |             32 |                    94 |                 94 |              15 |                15 |          9 |      29 |          32 |           0
+(1 row)
+
+-- Libros que cambiaron (antes EXCEPT después y al revés): deben ser 0 filas
+ isbn | titulo | autor | categoria | editorial | anio_publicacion | activo 
+------+--------+-------+-----------+-----------+------------------+--------
+(0 rows)
+
+ isbn | titulo | autores | categoria | editorial | anio_publicacion | activo 
+------+--------+---------+-----------+-----------+------------------+--------
+(0 rows)
+
+-- Préstamos que cambiaron de libro, lector o fechas: deben ser 0 filas
+ id_prestamo | id_lector | isbn | fecha_prestamo | fecha_vencimiento | fecha_devolucion 
+-------------+-----------+------+----------------+-------------------+------------------
+(0 rows)
+
+-- Libros con menos copias de las declaradas: deben ser 0 filas
+ isbn | ejemplares_disponibles | ejemplares 
+------+------------------------+------------
+(0 rows)
+
+DO
+
+== 7. Quitar lo viejo ==
+ALTER TABLE
+ALTER TABLE
+CREATE VIEW
+COMMIT
+
+== 8. Después ==
+     isbn      |              titulo               |        autores         | categoria | editorial | anio_publicacion | activo 
+---------------+-----------------------------------+------------------------+-----------+-----------+------------------+--------
+ 9780000000001 | Cien años de soledad              | Gabriel García Márquez | Novela    |           |             1967 | t
+ 9780000000002 | El amor en los tiempos del cólera | Gabriel García Márquez | Novela    |           |             1985 | t
+ 9780000000003 | Crónica de una muerte anunciada   | Gabriel García Márquez | Novela    |           |             1981 | t
+ 9780000000004 | Rayuela                           | Julio Cortázar         | Novela    |           |             1963 | t
+ 9780000000005 | Pedro Páramo                      | Juan Rulfo             | Novela    |           |             1955 | t
+(5 rows)
+
+     isbn      |              titulo               | ejemplares | prestados | disponibles 
+---------------+-----------------------------------+------------+-----------+-------------
+ 9780000000001 | Cien años de soledad              |          4 |         1 |           3
+ 9780000000002 | El amor en los tiempos del cólera |          3 |         0 |           3
+ 9780000000003 | Crónica de una muerte anunciada   |          2 |         1 |           1
+ 9780000000004 | Rayuela                           |          3 |         1 |           2
+ 9780000000005 | Pedro Páramo                      |          2 |         1 |           1
+(5 rows)
+
+  estado  | prestamos 
+----------+-----------
+ activo   |         2
+ devuelto |         9
+ vencido  |         4
+(3 rows)
+
+
+########## Segunda corrida sobre la misma base: debe detenerse sin tocar nada
+SET
+psql:/scripts/normalizacion.sql:32: ERROR:  La base ya tiene el esquema normalizado: no hay nada que migrar.
+CONTEXT:  PL/pgSQL function inline_code_block line 6 at RAISE

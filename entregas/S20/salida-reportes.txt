@@ -1,0 +1,162 @@
+SET search_path TO biblioteca;
+SET
+BEGIN;
+BEGIN
+INSERT INTO usuario (nombre_usuario, contrasena_hash, rol)
+VALUES ('bibliotecario.prueba',
+        '$2a$10$abcdefghijklmnopqrstuuK0z3bQ5wHq9pYv8nZ1sX2cR4dE6fG7h',
+        'bibliotecario');
+INSERT 0 1
+INSERT INTO prestamo (id_lector, id_ejemplar, registrado_por, devuelto_por,
+                      fecha_prestamo, fecha_vencimiento, fecha_devolucion)
+SELECT l.id_lector,
+       (SELECT min(e.id_ejemplar) FROM ejemplar e WHERE e.isbn = v.isbn),
+       b.id_usuario,
+       CASE WHEN v.d IS NOT NULL THEN b.id_usuario END,
+       CURRENT_DATE - v.p,
+       CURRENT_DATE - v.p + 14,
+       CURRENT_DATE - v.d
+FROM (VALUES
+    -- Mariana: 3 devueltos a tiempo
+    ('1000000001', '9780000000001', 120, 110),
+    ('1000000001', '9780000000004', 100,  90),
+    ('1000000001', '9780000000007',  80,  70),
+    -- Santiago: 3 devueltos; el Quijote, 6 días tarde (fue mora, ya no lo es)
+    ('1000000002', '9780000000001',  95,  85),
+    ('1000000002', '9780000000005',  75,  65),
+    ('1000000002', '9780000000009',  60,  40),
+    -- Valentina: 1 devuelto, 1 abierto en mora y 1 abierto todavía a tiempo
+    ('1000000003', '9780000000001',  70,  60),
+    ('1000000003', '9780000000010',  30, NULL),
+    ('1000000003', '9780000000003',   5, NULL),
+    -- Juan David: 0 devueltos y 3 abiertos (2 en mora; Rayuela vence hoy)
+    ('1000000004', '9780000000001',  20, NULL),
+    ('1000000004', '9780000000004',  14, NULL),
+    ('1000000004', '9780000000007',  40, NULL),
+    -- Camila: 2 devueltos y 1 abierto en mora
+    ('1000000005', '9780000000004',  50,  45),
+    ('1000000005', '9780000000011',  35,  30),
+    ('1000000005', '9780000000005',  16, NULL)
+    -- Sebastián y los demás lectores: ningún préstamo
+) AS v (documento, isbn, p, d)
+JOIN lector  l ON l.documento = v.documento
+CROSS JOIN (SELECT id_usuario FROM usuario
+            WHERE nombre_usuario = 'bibliotecario.prueba') b;
+INSERT 0 15
+SELECT count(*) AS prestamos,
+       count(*) FILTER (WHERE fecha_devolucion IS NULL) AS abiertos,
+       count(*) FILTER (WHERE fecha_devolucion IS NULL
+                          AND fecha_vencimiento < CURRENT_DATE) AS en_mora
+FROM prestamo;
+ prestamos | abiertos | en_mora 
+-----------+----------+---------
+        15 |        6 |       4
+(1 row)
+
+
+== Reporte 1. Los libros más prestados (los 3 primeros, con empates) ==
+SELECT b.titulo, b.autores, count(p.id_prestamo) AS prestamos
+FROM   libro_detalle b
+LEFT JOIN ejemplar e ON e.isbn = b.isbn
+LEFT JOIN prestamo p ON p.id_ejemplar = e.id_ejemplar
+WHERE  b.activo
+GROUP BY b.isbn, b.titulo, b.autores
+ORDER BY prestamos DESC, b.titulo
+FETCH FIRST 3 ROWS WITH TIES;
+        titulo        |        autores         | prestamos 
+----------------------+------------------------+-----------
+ Cien años de soledad | Gabriel García Márquez |         4
+ Rayuela              | Julio Cortázar         |         3
+ Ficciones            | Jorge Luis Borges      |         2
+(3 rows)
+
+== Reporte 2. El o los lectores que más libros han leído (préstamos devueltos) ==
+WITH leidos AS (
+    SELECT id_lector, count(*) AS devueltos
+    FROM   prestamo
+    WHERE  fecha_devolucion IS NOT NULL
+    GROUP BY id_lector
+)
+SELECT l.documento, l.nombres, l.apellidos, x.devueltos
+FROM   leidos x
+JOIN   lector l ON l.id_lector = x.id_lector
+WHERE  x.devueltos = (SELECT max(devueltos) FROM leidos)
+ORDER BY l.apellidos;
+ documento  | nombres  |    apellidos    | devueltos 
+------------+----------+-----------------+-----------
+ 1000000001 | Mariana  | Gómez Rojas     |         3
+ 1000000002 | Santiago | Rodríguez Pérez |         3
+(2 rows)
+
+== Reporte 3. Lectores morosos (al menos un préstamo abierto y vencido) ==
+SELECT l.documento, l.nombres, l.apellidos
+FROM   lector l
+WHERE  EXISTS (SELECT 1
+               FROM   prestamo p
+               WHERE  p.id_lector = l.id_lector
+                 AND  p.fecha_devolucion IS NULL
+                 AND  p.fecha_vencimiento < CURRENT_DATE)
+ORDER BY l.apellidos;
+ documento  |  nombres   |    apellidos     
+------------+------------+------------------
+ 1000000005 | Camila     | Hernández Torres
+ 1000000003 | Valentina  | López Díaz
+ 1000000004 | Juan David | Martínez Ruiz
+(3 rows)
+
+== Reporte 4. Préstamos en mora (lista de notificación) ==
+SELECT l.nombres || ' ' || l.apellidos          AS lector,
+       l.correo, l.telefono,
+       b.titulo,
+       p.fecha_vencimiento,
+       CURRENT_DATE - p.fecha_vencimiento        AS dias_mora
+FROM   prestamo p
+JOIN   lector   l ON l.id_lector   = p.id_lector
+JOIN   ejemplar e ON e.id_ejemplar = p.id_ejemplar
+JOIN   libro    b ON b.isbn        = e.isbn
+WHERE  p.fecha_devolucion IS NULL
+  AND  p.fecha_vencimiento < CURRENT_DATE
+ORDER BY dias_mora DESC, lector;
+          lector          |                 correo                 |  telefono  |        titulo        | fecha_vencimiento | dias_mora 
+--------------------------+----------------------------------------+------------+----------------------+-------------------+-----------
+ Juan David Martínez Ruiz | juan.martinez@correo-ejemplo.edu.co    | 3001000004 | Ficciones            | 2026-10-27        |        26
+ Valentina López Díaz     | valentina.lopez@correo-ejemplo.edu.co  | 3001000003 | La sombra del viento | 2026-11-06        |        16
+ Juan David Martínez Ruiz | juan.martinez@correo-ejemplo.edu.co    | 3001000004 | Cien años de soledad | 2026-11-16        |         6
+ Camila Hernández Torres  | camila.hernandez@correo-ejemplo.edu.co | 3001000005 | Pedro Páramo         | 2026-11-20        |         2
+(4 rows)
+
+== Extra (S20). Lo que en S19 quedaba desactualizado: disponibles con préstamos abiertos ==
+SELECT d.titulo, d.ejemplares, d.prestados, d.disponibles
+FROM   libro_disponibilidad d
+WHERE  d.prestados > 0
+ORDER BY d.titulo;
+             titulo              | ejemplares | prestados | disponibles 
+---------------------------------+------------+-----------+-------------
+ Cien años de soledad            |          4 |         1 |           3
+ Crónica de una muerte anunciada |          2 |         1 |           1
+ Ficciones                       |          2 |         1 |           1
+ La sombra del viento            |          4 |         1 |           3
+ Pedro Páramo                    |          2 |         1 |           1
+ Rayuela                         |          3 |         1 |           2
+(6 rows)
+
+SELECT estado, count(*) AS prestamos
+FROM   prestamo_estado
+GROUP BY estado
+ORDER BY estado;
+  estado  | prestamos 
+----------+-----------
+ activo   |         2
+ devuelto |         9
+ vencido  |         4
+(3 rows)
+
+ROLLBACK;
+ROLLBACK
+== Después del ROLLBACK la base queda como estaba ==
+SELECT count(*) AS prestamos FROM prestamo;
+ prestamos 
+-----------
+         0
+(1 row)
+

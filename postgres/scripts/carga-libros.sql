@@ -1,5 +1,8 @@
 -- Carga de libros desde CSV al esquema biblioteca (S14, Grupo 1)
 -- Patrón: tabla de paso -> validación -> tabla final -> bitácora, en una transacción.
+-- Actualizada en S20 para el esquema normalizado: cada fila válida llena
+-- libro, categoria y autor (si son nuevos), libro_autor y una fila de
+-- ejemplar por cada copia. Varios autores van separados por ";" en la columna autor.
 --
 -- Uso (desde entorno-docker/, con los CSV en postgres/scripts/datos/):
 --   docker compose exec postgres psql -U curso -d curso \
@@ -45,7 +48,10 @@ UPDATE stg_libro SET motivo = CASE
     WHEN titulo = ''                              THEN 'título vacío'
     WHEN length(titulo) > 200                     THEN 'título de más de 200 caracteres'
     WHEN autor = ''                               THEN 'autor vacío'
-    WHEN length(autor) > 120                      THEN 'autor de más de 120 caracteres'
+    WHEN EXISTS (SELECT 1 FROM regexp_split_to_table(autor, ';') AS a
+                 WHERE btrim(a) = '')             THEN 'autor vacío en la lista de autores'
+    WHEN EXISTS (SELECT 1 FROM regexp_split_to_table(autor, ';') AS a
+                 WHERE length(btrim(a)) > 120)    THEN 'autor de más de 120 caracteres'
     WHEN categoria = ''                           THEN 'categoría vacía'
     WHEN length(categoria) > 40                   THEN 'categoría de más de 40 caracteres'
     WHEN anio_publicacion !~ '^[0-9]{1,4}$'       THEN 'año no numérico'
@@ -70,11 +76,37 @@ WHERE motivo IS NULL
                 AND s2.motivo IS NULL
                 AND s2.linea_csv < stg_libro.linea_csv);
 
-INSERT INTO libro (isbn, titulo, autor, categoria, anio_publicacion, ejemplares_disponibles)
-SELECT isbn, titulo, autor, categoria,
-       anio_publicacion::smallint, ejemplares_disponibles::integer
-FROM stg_libro
-WHERE motivo IS NULL;
+-- Catálogos primero: solo los nombres que todavía no existen.
+INSERT INTO categoria (nombre)
+SELECT DISTINCT categoria FROM stg_libro
+WHERE  motivo IS NULL
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO autor (nombre)
+SELECT DISTINCT btrim(a)
+FROM   stg_libro, regexp_split_to_table(autor, ';') AS a
+WHERE  motivo IS NULL
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO libro (isbn, titulo, id_categoria, anio_publicacion)
+SELECT s.isbn, s.titulo, c.id_categoria, s.anio_publicacion::smallint
+FROM   stg_libro s
+JOIN   categoria c ON c.nombre = s.categoria
+WHERE  s.motivo IS NULL;
+
+INSERT INTO libro_autor (isbn, id_autor)
+SELECT DISTINCT s.isbn, au.id_autor
+FROM   stg_libro s, regexp_split_to_table(s.autor, ';') AS a
+JOIN   autor au ON au.nombre = btrim(a)
+WHERE  s.motivo IS NULL;
+
+-- El CSV trae cuántas copias llegan; cada una es un ejemplar.
+INSERT INTO ejemplar (isbn)
+SELECT s.isbn
+FROM   stg_libro s
+CROSS JOIN LATERAL generate_series(1, s.ejemplares_disponibles::integer) AS g
+WHERE  s.motivo IS NULL
+ORDER BY s.linea_csv, g;
 
 INSERT INTO rechazo_carga (archivo, linea, contenido, motivo)
 SELECT :'archivo', linea_csv, contenido, motivo

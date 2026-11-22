@@ -1,0 +1,37 @@
+SET
+BEGIN
+CREATE FUNCTION
+INSERT 0 1
+INSERT 0 1
+== Lo que el esquema de S19 aceptaba (pruebas B2, B3 y B4) ==
+                                  caso                                  |               resultado               
+------------------------------------------------------------------------+---------------------------------------
+ B4: el mismo préstamo dos veces (lector, ejemplar, fecha)              | rechazada por uq_prestamo_natural
+ B4 bis: el mismo ejemplar prestado a otro lector mientras sigue afuera | rechazada por prestamo_abierto_key
+ B4: devuelto_por sin fecha_devolucion                                  | rechazada por chk_devolucion_completa
+ B2: el mismo correo con otras mayúsculas                               | rechazada por lector_correo_lower_key
+ B3: libro con una categoría escrita de otra forma (sin catálogo)       | rechazada por fk_libro_categoria
+(5 rows)
+
+== B3: el segundo ejemplar de Crónica sí se puede prestar, y los disponibles bajan solos ==
+INSERT 0 1
+     isbn      |             titulo              | ejemplares | prestados | disponibles 
+---------------+---------------------------------+------------+-----------+-------------
+ 9780000000003 | Crónica de una muerte anunciada |          2 |         2 |           0
+(1 row)
+
+== B3: un libro con tres autores ya no es una lista en una celda ==
+INSERT 0 3
+INSERT 0 1
+INSERT 0 3
+     isbn      |            titulo             |                      autores                       | categoria 
+---------------+-------------------------------+----------------------------------------------------+-----------
+ 9780000000998 | Fundamentos de bases de datos | Abraham Silberschatz; Henry F. Korth; S. Sudarshan | Ciencia
+(1 row)
+
+            titulo             
+-------------------------------
+ Fundamentos de bases de datos
+(1 row)
+
+ROLLBACK
