@@ -3,6 +3,12 @@
 -- Base corregida a partir del modelo de S8 y preparada para S14.
 -- PostgreSQL
 
+-- ExtENSION para el hash de contrasenas (bcrypt).
+-- crypt(documento, gen_salt('bf')) produce un hash bcrypt de 60 caracteres.
+-- Se crea en public (search_path por defecto) para que el
+-- DROP SCHEMA biblioteca CASCADE de abajo no se la lleve.
+CREATE EXTENSION IF NOT EXISTS pgcrypto SCHEMA public;
+
 DROP SCHEMA IF EXISTS biblioteca CASCADE;
 CREATE SCHEMA biblioteca;
 SET search_path TO biblioteca;
