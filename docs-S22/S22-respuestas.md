@@ -10,7 +10,7 @@
 
 ## A1 (d) Qué reglas viola el último `INSERT`
 
-Viola la regla 2 (9 asistentes en una sala de capacidad 4) y la regla 3 (se cruza con las reservas de Ana y Bruno en la sala 1).
+Viola la regla 2 (9 asistentes en una sala de capacidad 4) y la regla 3 (se cruza con la reserva de Ana de 08:00 a 10:00). **No** se cruza con la de Bruno (10:00 a 12:00): los intervalos que solo se tocan en el extremo no se superponen.
 
 Ningún `CHECK` puede impedirlo porque un `CHECK` solo ve la fila que se inserta. La capacidad está en otra tabla, y el cruce depende de las demás filas de `reserva`. Son reglas entre filas y entre tablas, y por eso van en un trigger.
 
@@ -28,7 +28,7 @@ El ejemplo de las 4 horas además choca con `reserva_duracion`: una regla de pol
 
 El último `UPDATE` no toca la columna `estado`, y el trigger es `AFTER UPDATE OF estado`: no se dispara. Aunque se disparara, el `WHEN` exige el paso a `no_asistio` desde otro estado, y Bruno ya estaba en `no_asistio`.
 
-Sin el `WHEN`, cualquier `UPDATE` que dejara la fila en `no_asistio` volvería a poner la sanción en `hoy + 7`. Cada corrección posterior de esa reserva alargaría la sanción, y el estudiante nunca saldría de ella.
+Sin el `WHEN`, un `UPDATE` que vuelva a escribir `estado = 'no_asistio'` (aunque no cambie el valor) volvería a fijar la sanción en `hoy + 7`. El `UPDATE` de `asistentes` **no** dispara ese trigger ni siquiera sin `WHEN`, porque está definido como `UPDATE OF estado`.
 
 ## A6 (b) Ciclo contra conjunto
 

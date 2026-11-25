@@ -1,0 +1,99 @@
+SET
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+psql:<stdin>:42: ERROR:  new row for relation "reserva" violates check constraint "reserva_orden"
+DETAIL:  Failing row contains (10, 1, 2610006, 2026-12-03 10:00:00, 2026-12-03 09:00:00, 2, activa).
+psql:<stdin>:44: ERROR:  new row for relation "reserva" violates check constraint "reserva_duracion"
+DETAIL:  Failing row contains (11, 1, 2610006, 2026-12-03 08:00:00, 2026-12-03 12:00:00, 2, activa).
+psql:<stdin>:46: ERROR:  new row for relation "reserva" violates check constraint "reserva_horario"
+DETAIL:  Failing row contains (12, 1, 2610006, 2026-12-03 20:00:00, 2026-12-03 22:00:00, 2, activa).
+psql:<stdin>:48: ERROR:  new row for relation "reserva" violates check constraint "reserva_asistentes"
+DETAIL:  Failing row contains (13, 1, 2610006, 2026-12-03 10:00:00, 2026-12-03 11:00:00, 0, activa).
+BEGIN
+DELETE 1
+ recursos_que_quedan 
+---------------------
+                   0
+(1 row)
+
+ROLLBACK
+psql:<stdin>:57: ERROR:  update or delete on table "sala" violates foreign key constraint "reserva_sala_fk" on table "reserva"
+DETAIL:  Key (id_sala)=(1) is still referenced from table "reserva".
+BEGIN
+INSERT 0 1
+ROLLBACK
+CREATE FUNCTION
+CREATE FUNCTION
+ codigo  | proxima | pasada 
+---------+---------+--------
+ 2610001 |     5.0 |    0.0
+ 2610002 |     2.0 |    2.0
+ 2610003 |     3.0 |    2.0
+ 2610004 |     2.0 |    0.0
+ 2610005 |     0.0 |    0.0
+ 2610006 |     0.0 |    2.0
+(6 rows)
+
+ a | b | c | d 
+---+---+---+---
+ f | t | t | t
+(1 row)
+
+CREATE PROCEDURE
+CREATE PROCEDURE
+psql:<stdin>:195: ERROR:  El estudiante 2610005 esta sancionado hasta 2026-12-25
+CONTEXT:  PL/pgSQL function reservar(character varying,integer,timestamp without time zone,timestamp without time zone,integer) line 14 at RAISE
+psql:<stdin>:196: ERROR:  La sala 4 esta en mantenimiento
+CONTEXT:  PL/pgSQL function reservar(character varying,integer,timestamp without time zone,timestamp without time zone,integer) line 22 at RAISE
+psql:<stdin>:197: ERROR:  La sala 1 admite 4 personas, no 5
+CONTEXT:  PL/pgSQL function reservar(character varying,integer,timestamp without time zone,timestamp without time zone,integer) line 25 at RAISE
+psql:<stdin>:198: ERROR:  La sala 1 esta ocupada en ese horario
+CONTEXT:  PL/pgSQL function reservar(character varying,integer,timestamp without time zone,timestamp without time zone,integer) line 29 at RAISE
+psql:<stdin>:199: ERROR:  El estudiante 2610001 superaria las 6 horas semanales (lleva 5.0 h)
+CONTEXT:  PL/pgSQL function reservar(character varying,integer,timestamp without time zone,timestamp without time zone,integer) line 35 at RAISE
+psql:<stdin>:200: NOTICE:  Reserva 15 creada
+CALL
+psql:<stdin>:201: NOTICE:  Reserva 16 creada
+CALL
+psql:<stdin>:202: NOTICE:  Reserva 17 creada
+CALL
+psql:<stdin>:203: ERROR:  El estudiante 2610099 no existe
+CONTEXT:  PL/pgSQL function reservar(character varying,integer,timestamp without time zone,timestamp without time zone,integer) line 11 at RAISE
+psql:<stdin>:204: ERROR:  La reserva 7 no esta activa (estado: cumplida)
+CONTEXT:  PL/pgSQL function cancelar(integer) line 11 at RAISE
+psql:<stdin>:205: NOTICE:  Reserva 2 cancelada
+CALL
+BEGIN
+INSERT 0 1
+ROLLBACK
+CREATE FUNCTION
+psql:<stdin>:247: NOTICE:  trigger "reserva_validar" for relation "reserva" does not exist, skipping
+DROP TRIGGER
+CREATE TRIGGER
+psql:<stdin>:254: ERROR:  La sala 3 admite 10 personas, no 12
+CONTEXT:  PL/pgSQL function validar_reserva() line 18 at RAISE
+psql:<stdin>:256: ERROR:  La sala 3 esta ocupada en ese horario
+CONTEXT:  PL/pgSQL function validar_reserva() line 23 at RAISE
+psql:<stdin>:257: ERROR:  La sala 2 esta ocupada en ese horario
+CONTEXT:  PL/pgSQL function validar_reserva() line 23 at RAISE
+UPDATE 1
+psql:<stdin>:259: ERROR:  La sala 2 esta ocupada en ese horario
+CONTEXT:  PL/pgSQL function validar_reserva() line 23 at RAISE
+CREATE FUNCTION
+psql:<stdin>:276: NOTICE:  trigger "reserva_sancionar" for relation "reserva" does not exist, skipping
+DROP TRIGGER
+CREATE TRIGGER
+UPDATE 1
+ codigo  | nombre | dias 
+---------+--------+------
+ 2610005 | Elena  |   30
+ 2610006 | Felipe |    7
+(2 rows)
+
+psql:<stdin>:286: ERROR:  El estudiante 2610006 esta sancionado hasta 2026-12-02
+CONTEXT:  PL/pgSQL function reservar(character varying,integer,timestamp without time zone,timestamp without time zone,integer) line 14 at RAISE
+UPDATE 1
+CREATE PROCEDURE
+CALL
